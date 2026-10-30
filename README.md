@@ -1,6 +1,12 @@
-# Colegio Académico
+# La Generación del Mañana
 
 Plataforma de gestión académica para un colegio, construida con Laravel 12 y MySQL 8.
+
+## Taller en Mac
+
+Esta copia ya está preparada con PHP de XAMPP y SQLite. Para iniciarla ejecuta `cd app` y `./iniciar.command`. Consulta la [guía del sistema](app/README.md) y las [cuentas de acceso](app/ACCESO.md).
+
+El procedimiento siguiente es la alternativa con Docker y MySQL.
 
 ## Requisitos
 

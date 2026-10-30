@@ -29,7 +29,7 @@ class MarksController extends Controller
     {
         $group = $this->assignment($assignment);
         $data = $request->validate(['enrollment_id' => 'required|integer|exists:enrollments,id', 'period_id' => 'required|integer|exists:periods,id', 'score' => ['required', 'numeric', 'between:' . config('academic.min_score', 0) . ',' . config('academic.max_score', 100)], 'observation' => 'nullable|string|max:255']);
-        $period = DB::table('periods')->where('id', $data['period_id'])->where('school_year_id', $group->school_year_id)->where('open', true)->whereDate('start_date', '<=', now())->whereDate('end_date', '>=', now())->first();
+        $period = DB::table('periods')->where('id', $data['period_id'])->where('school_year_id', $group->school_year_id)->where('open', true)->whereDate('start_date', '<=', now(config('academic.timezone'))->toDateString())->whereDate('end_date', '>=', now(config('academic.timezone'))->toDateString())->first();
         if (!$period || !DB::table('school_years')->where('id', $group->school_year_id)->where('active', true)->exists()) throw ValidationException::withMessages(['period_id' => 'El período no está abierto para este ciclo.']);
         if (!DB::table('enrollments')->where('id', $data['enrollment_id'])->where('school_year_id', $group->school_year_id)->where('grade_id', $group->grade_id)->where('section_id', $group->section_id)->where('active', true)->exists()) throw ValidationException::withMessages(['enrollment_id' => 'El estudiante no está inscrito en este grupo.']);
         DB::transaction(function () use ($request, $assignment, $data) {
