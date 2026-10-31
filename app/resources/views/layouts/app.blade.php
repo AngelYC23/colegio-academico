@@ -28,7 +28,7 @@ $groups = ['Comunidad' => ['students', 'teachers', 'guardians', 'student_guardia
 @endif
 @if($label === 'Configuración')</details>@endif
 @endforeach
-@elseif(auth()->user()->role === 'teacher')<a href="{{ route('marks.index') }}" @class(['active' => request()->routeIs('marks.*')])>Mis grupos</a>
+@elseif(auth()->user()->role === 'teacher')<a href="{{ route('courses.mine') }}" @class(['active' => request()->routeIs('courses.*')])>Mis cursos y alumnos</a><a href="{{ route('marks.index') }}" @class(['active' => request()->routeIs('marks.*')])>Mis grupos</a>
 @else<a href="{{ route('personal') }}" @class(['active' => request()->routeIs('personal')])>Mi expediente</a>@endif
 </nav></details>
 <div class="account"><div class="account-name">{{ auth()->user()->name }}</div><small>{{ $roles[auth()->user()->role] ?? 'Cuenta institucional' }}</small>
@@ -45,6 +45,7 @@ $groups = ['Comunidad' => ['students', 'teachers', 'guardians', 'student_guardia
 @yield('content')
 <div class="auth-footer">Plataforma de gestión institucional</div></div></main>
 @endauth
+<script src="{{ asset('js/password-confirmation.js') }}" defer></script>
 <script>
 const menu = document.querySelector('.navigation');
 if (menu) {

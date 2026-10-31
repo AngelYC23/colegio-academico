@@ -1,0 +1,13 @@
+@extends('layouts.app')
+@section('title', 'Cursos del profesor')
+@section('content')
+<div class="toolbar"><div><h2 class="section-title">{{ $person->first_name }} {{ $person->last_name }}</h2><p class="section-note">{{ $person->code }}</p></div>
+@if(auth()->user()->role === 'admin')<a class="btn btn-primary" href="{{ route('resource.create', ['resource' => 'assignments', 'teacher_id' => $person->id]) }}">+ Asignar curso al profesor</a>@endif</div>
+@include('partials.person-details')
+@include('partials.search-filters', ['searchPlaceholder' => 'Curso, código, grado o sección'])
+<div class="card"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Curso</th><th>Ciclo</th><th>Grado / sección</th><th>Alumnos inscritos</th><th>Acciones</th></tr></thead><tbody>
+@forelse($courses as $course)<tr><td><strong>{{ $course->subject }}</strong><div class="small text-muted">{{ $course->code }}{{ $course->active ? '' : ' · Inactivo' }}</div></td><td>{{ $course->year }}@if(!$course->cycle_active)<div class="small text-muted">Ciclo cerrado · Consulta</div>@elseif($course->year > now(config('academic.timezone'))->year)<div class="small text-muted">Próximo ciclo</div>@endif</td><td>{{ $course->grade }} ({{ $course->level }}) · {{ $course->section }}</td><td>{{ $course->student_count }}</td><td><a class="btn btn-sm btn-outline-primary" href="{{ route('courses.roster', $course->id) }}">Ver alumnos</a> @if($course->active)<a class="btn btn-sm btn-outline-secondary" href="{{ route('marks.group', $course->id) }}">Calificaciones</a>@endif</td></tr>
+@empty<tr><td colspan="5" class="empty-state"><strong>{{ $searchQuery !== '' || $cycleId ? 'Sin resultados para estos filtros' : 'Sin cursos asignados' }}</strong>Prueba otro ciclo o limpia los filtros.</td></tr>@endforelse
+</tbody></table></div></div>
+@if(auth()->user()->role === 'admin')<a class="btn btn-outline-secondary mt-3" href="{{ route('resource.index', 'teachers') }}">Volver a profesores</a>@endif
+@endsection

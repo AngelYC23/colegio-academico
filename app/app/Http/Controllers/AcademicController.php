@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Support\RelatedLabels;
 use App\Support\InputRules;
+use App\Support\RecordSearch;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -37,14 +39,23 @@ class AcademicController extends Controller
     {
         $this->admin();
         [$title, $fields] = $this->definition($resource);
-        $rows = DB::table($resource)->orderByDesc('id')->paginate(20);
+        [$searchQuery, $cycleId] = RecordSearch::filters(request());
+        $supportsCycle = !in_array($resource, ['users', 'relationships']);
+        $cycles = $supportsCycle ? RecordSearch::cycles() : collect();
+        $query = DB::table($resource)->orderByDesc($resource . '.id');
+        $columns = array_map(fn ($key) => $resource . '.' . $key, array_diff(array_keys($fields), array_keys(self::FOREIGN), ['active', 'open', 'primary']));
+        $relations = [];
+        foreach (array_intersect_key(self::FOREIGN, $fields) as $key => $table) $relations[$resource . '.' . $key] = $table;
+        RecordSearch::apply($query, $columns, $searchQuery, $relations);
+        if ($cycleId && $supportsCycle) $this->filterCycle($query, $resource, $cycleId);
+        $rows = $query->paginate(20)->withQueryString();
         $related = [];
         foreach (array_keys($fields) as $key) {
             if (isset(self::FOREIGN[$key])) {
                 $related[$key] = RelatedLabels::forIds(self::FOREIGN[$key], $rows->getCollection()->pluck($key));
             }
         }
-        return view('resource.index', compact('title', 'fields', 'rows', 'resource', 'related'));
+        return view('resource.index', compact('title', 'fields', 'rows', 'resource', 'related', 'searchQuery', 'cycleId', 'cycles', 'supportsCycle'));
     }
 
     public function form(string $resource, ?int $id = null)
@@ -67,7 +78,17 @@ class AcademicController extends Controller
                 }
             }
         }
-        return view('resource.form', compact('title', 'fields', 'resource', 'row', 'options'));
+        $defaults = [];
+        if (!$id && in_array($resource, ['assignments', 'enrollments'])) {
+            $allowed = $resource === 'assignments'
+                ? ['teacher_id' => 'teachers', 'school_year_id' => 'school_years', 'grade_id' => 'grades', 'section_id' => 'sections']
+                : ['student_id' => 'students'];
+            foreach ($allowed as $key => $table) {
+                request()->validate([$key => 'nullable|integer|min:1|exists:' . $table . ',id']);
+                if (request()->filled($key)) $defaults[$key] = request()->integer($key);
+            }
+        }
+        return view('resource.form', compact('title', 'fields', 'resource', 'row', 'options', 'defaults'));
     }
 
     public function save(Request $request, string $resource, ?int $id = null)
@@ -110,6 +131,7 @@ class AcademicController extends Controller
                 };
             }
             $rules['password'] = [$id ? 'nullable' : 'required', 'string', 'min:12', 'confirmed'];
+            $rules['password_confirmation'] = ['nullable', 'string', 'required_with:password', 'same:password'];
         }
         if (in_array($resource, ['students', 'teachers', 'subjects'])) $rules['code'][] = Rule::unique($resource, 'code')->ignore($id);
         if (in_array($resource, ['students', 'teachers', 'guardians'])) {
@@ -133,6 +155,7 @@ class AcademicController extends Controller
         if ($resource === 'users' && $id && strcasecmp((string) DB::table('users')->where('id', $id)->value('email'), $data['email']) !== 0) {
             $data['email_verified_at'] = null;
         }
+        unset($data['password_confirmation']);
         if ($resource === 'users' && empty($data['password'])) unset($data['password']);
         if ($resource === 'users' && isset($data['password'])) $data['password'] = Hash::make($data['password']);
         if ($resource === 'users' && $id === Auth::id() && (!$data['active'] || $data['role'] !== 'admin')) throw ValidationException::withMessages(['role' => 'No puede quitar su propio acceso administrativo.']);
@@ -192,7 +215,21 @@ class AcademicController extends Controller
             if ($data['start_date'] < $cycle->start_date || $data['end_date'] > $cycle->end_date) throw ValidationException::withMessages(['start_date' => 'El período debe estar dentro del ciclo.']);
             if ($id && DB::table('marks')->where('period_id', $id)->exists() && $data['school_year_id'] != DB::table('periods')->where('id', $id)->value('school_year_id')) throw ValidationException::withMessages(['school_year_id' => 'No puede cambiar el ciclo de un período con notas.']);
         }
-        DB::transaction(function () use ($resource, $data, $id, $request) {
+        $savedId = DB::transaction(function () use ($resource, $data, $id, $request) {
+            if ($id && in_array($resource, ['enrollments', 'assignments'])) {
+                $existing = DB::table($resource)->where('id', $id)->lockForUpdate()->first();
+                $relationKey = $resource === 'enrollments' ? 'enrollment_id' : 'assignment_id';
+                if (DB::table('course_enrollments')->where($relationKey, $id)->exists()) {
+                    $protected = $resource === 'enrollments'
+                        ? ['student_id', 'school_year_id', 'grade_id', 'section_id']
+                        : ['subject_id', 'school_year_id', 'grade_id', 'section_id'];
+                    foreach ($protected as $key) {
+                        if ($data[$key] != $existing->$key) {
+                            throw ValidationException::withMessages([$key => 'El registro tiene cursos o alumnos vinculados; conserve su ciclo, grupo e identidad.']);
+                        }
+                    }
+                }
+            }
             if ($resource === 'periods') {
                 DB::table('school_years')->where('id', $data['school_year_id'])->lockForUpdate()->first();
                 $others = DB::table('periods')->where('school_year_id', $data['school_year_id'])
@@ -230,8 +267,41 @@ class AcademicController extends Controller
             if ($id) DB::table($resource)->where('id', $id)->update($data);
             else $id = DB::table($resource)->insertGetId($data + ['created_at' => now()]);
             DB::table('audit_logs')->insert(['user_id' => Auth::id(), 'action' => $request->isMethod('put') ? 'update' : 'create', 'entity' => $resource, 'entity_id' => $id, 'ip_address' => $request->ip(), 'changes' => json_encode(collect($data)->except('password')->all()), 'created_at' => now()]);
+            return $id;
         });
+        if ($resource === 'enrollments') {
+            return redirect()->route('courses.student', ['student' => $data['student_id'], 'enrollment' => $savedId])
+                ->with('status', 'Inscripción guardada. Ahora seleccione los cursos del estudiante.');
+        }
+        if ($resource === 'assignments') {
+            return redirect()->route('courses.teacher', $data['teacher_id'])->with('status', 'Curso asignado al profesor. Los alumnos se seleccionan individualmente desde Estudiantes → Cursos.');
+        }
         return redirect()->route('resource.index', $resource)->with('status', 'Registro guardado correctamente.');
+    }
+
+    private function filterCycle(Builder $query, string $resource, int $cycle): void
+    {
+        if (in_array($resource, ['enrollments', 'assignments', 'periods'])) {
+            $query->where($resource . '.school_year_id', $cycle);
+        } elseif ($resource === 'school_years') {
+            $query->where('school_years.id', $cycle);
+        } elseif ($resource === 'students') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('enrollments as cycle_e')->whereColumn('cycle_e.student_id', 'students.id')->where('cycle_e.school_year_id', $cycle));
+        } elseif (in_array($resource, ['teachers', 'subjects'])) {
+            $column = $resource === 'teachers' ? 'teacher_id' : 'subject_id';
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('assignments as cycle_a')->whereColumn('cycle_a.' . $column, $resource . '.id')->where('cycle_a.school_year_id', $cycle));
+        } elseif (in_array($resource, ['grades', 'sections'])) {
+            $column = $resource === 'grades' ? 'grade_id' : 'section_id';
+            $query->where(function ($q) use ($resource, $column, $cycle) {
+                $q->whereExists(fn ($e) => $e->selectRaw('1')->from('enrollments as cycle_e')->whereColumn('cycle_e.' . $column, $resource . '.id')->where('cycle_e.school_year_id', $cycle))
+                    ->orWhereExists(fn ($a) => $a->selectRaw('1')->from('assignments as cycle_a')->whereColumn('cycle_a.' . $column, $resource . '.id')->where('cycle_a.school_year_id', $cycle));
+            });
+        } elseif ($resource === 'guardians') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('student_guardians as cycle_sg')->join('enrollments as cycle_e', 'cycle_e.student_id', '=', 'cycle_sg.student_id')
+                ->whereColumn('cycle_sg.guardian_id', 'guardians.id')->where('cycle_e.school_year_id', $cycle));
+        } elseif ($resource === 'student_guardians') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('enrollments as cycle_e')->whereColumn('cycle_e.student_id', 'student_guardians.student_id')->where('cycle_e.school_year_id', $cycle));
+        }
     }
 
     private function definition(string $resource): array

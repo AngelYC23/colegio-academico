@@ -48,7 +48,7 @@ class AccessController extends Controller
 
     public function changePassword(Request $request)
     {
-        $data = $request->validate(['current_password' => 'required|current_password', 'password' => 'required|string|min:12|confirmed']);
+        $data = $request->validate(['current_password' => 'required|current_password', 'password' => 'required|string|min:12|confirmed', 'password_confirmation' => 'required|string|same:password']);
         Auth::user()->update(['password' => Hash::make($data['password'])]);
         DB::table('audit_logs')->insert(['user_id' => Auth::id(), 'action' => 'password_changed', 'entity' => 'users', 'entity_id' => Auth::id(), 'ip_address' => $request->ip(), 'created_at' => now()]);
         return back()->with('status', 'Contraseña actualizada.');
@@ -66,7 +66,7 @@ class AccessController extends Controller
     public function reset(Request $request)
     {
         InputRules::normalize($request, ['email']);
-        $data = $request->validate(['token' => 'required|string|max:255', 'email' => ['required', ...InputRules::email()], 'password' => 'required|string|min:12|confirmed']);
+        $data = $request->validate(['token' => 'required|string|max:255', 'email' => ['required', ...InputRules::email()], 'password' => 'required|string|min:12|confirmed', 'password_confirmation' => 'required|string|same:password']);
         $result = Password::reset($data, function (User $user, string $password) {
             $user->forceFill(['password' => Hash::make($password)])->save();
         });

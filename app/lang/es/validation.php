@@ -1,5 +1,9 @@
 <?php
 return [
+    'same' => 'La confirmación de contraseña debe ser exactamente igual a la contraseña.',
+    'required_with' => 'El campo :attribute es obligatorio al ingresar :values.',
+    'distinct' => 'No seleccione dos veces el mismo curso.',
+    'array' => 'La selección de :attribute no es válida.',
     'required' => 'El campo :attribute es obligatorio.',
     'email' => 'El campo :attribute debe ser un correo válido.',
     'unique' => 'Ya existe un registro con ese valor de :attribute.',
@@ -19,7 +23,7 @@ return [
     'date' => 'El campo :attribute debe ser una fecha válida.',
     'in' => 'La opción seleccionada para :attribute no es válida.',
     'min' => ['string' => 'El campo :attribute debe tener al menos :min caracteres.', 'numeric' => 'El campo :attribute debe ser al menos :min.'],
-    'max' => ['string' => 'El campo :attribute no debe superar :max caracteres.', 'numeric' => 'El campo :attribute no debe superar :max.'],
+    'max' => ['array' => 'No seleccione más de :max elementos.', 'string' => 'El campo :attribute no debe superar :max caracteres.', 'numeric' => 'El campo :attribute no debe superar :max.'],
     'between' => ['numeric' => 'El campo :attribute debe estar entre :min y :max.'],
-    'attributes' => ['identity' => 'usuario o correo', 'password' => 'contraseña', 'email' => 'correo', 'current_password' => 'contraseña actual', 'score' => 'nota', 'observation' => 'observación', 'period_id' => 'período', 'enrollment_id' => 'inscripción'],
+    'attributes' => ['identity' => 'usuario o correo', 'password' => 'contraseña', 'email' => 'correo', 'current_password' => 'contraseña actual', 'password_confirmation' => 'confirmación de contraseña', 'assignment_ids' => 'cursos', 'assignment_ids.*' => 'curso', 'score' => 'nota', 'observation' => 'observación', 'period_id' => 'período', 'enrollment_id' => 'inscripción'],
 ];

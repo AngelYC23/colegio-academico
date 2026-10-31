@@ -4,6 +4,7 @@ use App\Http\Controllers\AccessController;
 use App\Http\Controllers\AcademicController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MarksController;
+use App\Http\Controllers\CourseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,11 @@ Route::middleware(['auth', 'active.account'])->group(function () {
     Route::get('/calificaciones', [MarksController::class, 'index'])->name('marks.index');
     Route::get('/calificaciones/{assignment}', [MarksController::class, 'group'])->name('marks.group');
     Route::post('/calificaciones/{assignment}', [MarksController::class, 'save'])->name('marks.save');
+    Route::get('/estudiantes/{student}/cursos', [CourseController::class, 'student'])->whereNumber('student')->name('courses.student');
+    Route::put('/estudiantes/{student}/cursos', [CourseController::class, 'saveStudent'])->whereNumber('student')->name('courses.student.save');
+    Route::get('/docentes/{teacher}/cursos', [CourseController::class, 'teacher'])->whereNumber('teacher')->name('courses.teacher');
+    Route::get('/mis-cursos', [CourseController::class, 'teacher'])->name('courses.mine');
+    Route::get('/cursos/{assignment}/estudiantes', [CourseController::class, 'roster'])->whereNumber('assignment')->name('courses.roster');
     Route::get('/gestion/{resource}', [AcademicController::class, 'index'])->name('resource.index');
     Route::get('/gestion/{resource}/nuevo', [AcademicController::class, 'form'])->name('resource.create');
     Route::get('/gestion/{resource}/{id}/editar', [AcademicController::class, 'form'])->name('resource.edit');

@@ -43,3 +43,11 @@ Para cargar opcionalmente los datos institucionales de presentación y las cuent
 Los períodos cerrados conservan sus notas. El conjunto de ejemplo corresponde al ciclo 2026; para registrar notas en otra fecha, configura un ciclo y un período vigentes. No se permite alterar el grupo de una inscripción o asignación que ya tenga notas.
 
 El alcance definitivo del taller debe cotejarse con el enunciado del docente. La implementación actual no incluye pagos ni módulos administrativos ajenos a la gestión académica.
+
+## Cursos por estudiante
+
+Consulta [CURSOS.md](CURSOS.md) para la selección individual de cursos, las listas de alumnos de cada profesor y la actualización de la base de datos.
+
+## Ciclos 2025/2027 y buscador
+
+Consulta [CICLOS_Y_BUSQUEDA.md](CICLOS_Y_BUSQUEDA.md) para usar los filtros y cargar opcionalmente los nuevos ciclos de ejemplo sin borrar datos existentes.

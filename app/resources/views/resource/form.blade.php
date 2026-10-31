@@ -9,7 +9,7 @@
 @foreach($fields as $key => $label)
 @php
     $required = $resource === 'users' && $key === 'email' || !in_array($key, \App\Support\InputRules::OPTIONAL);
-    $value = old($key, $row->$key ?? '');
+    $value = old($key, $row->$key ?? $defaults[$key] ?? '');
     $invalid = $errors->has($key) ? ' is-invalid' : '';
     $isDate = in_array($key, ['birth_date', 'start_date', 'end_date', 'enrolled_at']);
     $isNumber = in_array($key, ['year', 'capacity', 'percentage']);
@@ -45,8 +45,8 @@
 </div>
 @endforeach
 @if($resource === 'users')
-<div class="col-sm-6"><label class="form-label" for="password">Contraseña {{ $row ? '(dejar vacía para conservar)' : '(mínimo 12 caracteres) *' }}</label><input class="form-control" type="password" id="password" name="password" minlength="12" autocomplete="new-password" @required(!$row)></div>
-<div class="col-sm-6"><label class="form-label" for="password_confirmation">Confirmar contraseña</label><input class="form-control" type="password" id="password_confirmation" name="password_confirmation" autocomplete="new-password" @required(!$row)></div>
+<div class="col-sm-6"><label class="form-label" for="password">Contraseña {{ $row ? '(dejar vacía para conservar)' : '(mínimo 12 caracteres) *' }}</label><input class="form-control @error('password') is-invalid @enderror" type="password" id="password" name="password" minlength="12" autocomplete="new-password" @required(!$row)>@error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+<div class="col-sm-6"><label class="form-label" for="password_confirmation">Confirmar contraseña</label><input class="form-control @error('password_confirmation') is-invalid @enderror" type="password" id="password_confirmation" name="password_confirmation" autocomplete="new-password" @required(!$row)>@error('password_confirmation')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
 @endif
 </div>
 <div class="mt-4"><button class="btn btn-primary">Guardar</button> <a class="btn btn-outline-secondary" href="{{ route('resource.index', $resource) }}">Cancelar</a></div>
