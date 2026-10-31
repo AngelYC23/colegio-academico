@@ -11,8 +11,15 @@ Artisan::command('academic:create-admin', function () {
     $username = $this->ask('Nombre de usuario');
     $email = $this->ask('Correo');
     $password = $this->secret('Contraseña (mínimo 12 caracteres)');
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password ?? '') < 12 || !$name || !$username) {
-        $this->error('Datos inválidos.');
+    $email = is_string($email) ? mb_strtolower(trim($email)) : $email;
+    $validator = \Illuminate\Support\Facades\Validator::make(compact('name', 'username', 'email', 'password'), [
+        'name' => ['required', ...\App\Support\InputRules::personName()],
+        'username' => ['required', ...\App\Support\InputRules::username(), 'unique:users,username'],
+        'email' => ['required', ...\App\Support\InputRules::email(), 'unique:users,email'],
+        'password' => ['required', 'string', 'min:12'],
+    ]);
+    if ($validator->fails()) {
+        foreach ($validator->errors()->all() as $message) $this->error($message);
         return 1;
     }
     \App\Models\User::create(['name' => $name, 'username' => $username, 'email' => $email, 'password' => $password, 'role' => 'admin', 'active' => true]);
