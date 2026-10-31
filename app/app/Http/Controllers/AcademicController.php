@@ -57,6 +57,13 @@ class AcademicController extends Controller
             if (isset(self::FOREIGN[$key])) {
                 $table = self::FOREIGN[$key];
                 $options[$key] = RelatedLabels::options($table);
+                if ($key === 'user_id') {
+                    $role = ['students' => 'student', 'teachers' => 'teacher', 'guardians' => 'guardian'][$resource];
+                    $eligible = DB::table('users')->where('role', $role)
+                        ->whereNotIn('id', DB::table($resource)->whereNotNull('user_id')->when($id, fn ($q) => $q->where('id', '<>', $id))->select('user_id'))
+                        ->pluck('id')->all();
+                    $options[$key] = array_intersect_key($options[$key], array_flip($eligible));
+                }
             }
         }
         return view('resource.form', compact('title', 'fields', 'resource', 'row', 'options'));
@@ -84,11 +91,18 @@ class AcademicController extends Controller
             $rules['password'] = [$id ? 'nullable' : 'required', 'string', 'min:12', 'confirmed'];
         }
         if (in_array($resource, ['students', 'teachers', 'subjects'])) $rules['code'][] = Rule::unique($resource, 'code')->ignore($id);
+        if (in_array($resource, ['students', 'teachers', 'guardians'])) {
+            $rules['user_id'][] = Rule::unique($resource, 'user_id')->ignore($id);
+        }
+        if ($resource === 'relationships') $rules['name'][] = Rule::unique('relationships', 'name')->ignore($id);
+        if ($resource === 'grades') $rules['name'][] = Rule::unique('grades', 'name')->where('level', $request->input('level'))->ignore($id);
+        if ($resource === 'sections') $rules['name'][] = Rule::unique('sections', 'name')->where('grade_id', $request->input('grade_id'))->ignore($id);
+        if ($resource === 'periods') $rules['name'][] = Rule::unique('periods', 'name')->where('school_year_id', $request->input('school_year_id'))->ignore($id);
         if ($resource === 'school_years') $rules['year'][] = Rule::unique('school_years', 'year')->ignore($id);
         if ($resource === 'enrollments') $rules['student_id'][] = Rule::unique('enrollments', 'student_id')->where('school_year_id', $request->input('school_year_id'))->ignore($id);
         if ($resource === 'assignments') $rules['subject_id'][] = Rule::unique('assignments', 'subject_id')->where('school_year_id', $request->input('school_year_id'))->where('section_id', $request->input('section_id'))->ignore($id);
         if ($resource === 'student_guardians') $rules['guardian_id'][] = Rule::unique('student_guardians', 'guardian_id')->where('student_id', $request->input('student_id'))->ignore($id);
-        $data = $request->validate($rules);
+        $data = $request->validate($rules, [], array_merge($fields, ['password' => 'contraseña']));
         if ($resource === 'users' && empty($data['password'])) unset($data['password']);
         if ($resource === 'users' && isset($data['password'])) $data['password'] = Hash::make($data['password']);
         if ($resource === 'users' && $id === Auth::id() && (!$data['active'] || $data['role'] !== 'admin')) throw ValidationException::withMessages(['role' => 'No puede quitar su propio acceso administrativo.']);
@@ -101,7 +115,23 @@ class AcademicController extends Controller
             $expected = ['students' => 'student', 'teachers' => 'teacher', 'guardians' => 'guardian'][$resource];
             if (!DB::table('users')->where('id', $data['user_id'])->where('role', $expected)->exists()) throw ValidationException::withMessages(['user_id' => 'La cuenta debe tener el rol correspondiente.']);
         }
+        if ($resource === 'sections' && $id && $data['grade_id'] != DB::table('sections')->where('id', $id)->value('grade_id')) {
+            if (DB::table('enrollments')->where('section_id', $id)->exists() || DB::table('assignments')->where('section_id', $id)->exists()) {
+                throw ValidationException::withMessages(['grade_id' => 'La sección tiene inscripciones o asignaciones; conserve su grado para mantener el historial.']);
+            }
+        }
         if (in_array($resource, ['enrollments', 'assignments'])) {
+            if (!DB::table('grades')->where('id', $data['grade_id'])->where('active', true)->exists()) {
+                throw ValidationException::withMessages(['grade_id' => 'El grado no está activo.']);
+            }
+            $profile = $resource === 'enrollments' ? 'students' : 'teachers';
+            $profileKey = $resource === 'enrollments' ? 'student_id' : 'teacher_id';
+            if ($data['active'] && !DB::table($profile)->where('id', $data[$profileKey])->where('active', true)->exists()) {
+                throw ValidationException::withMessages([$profileKey => 'Seleccione un perfil activo.']);
+            }
+            if ($resource === 'assignments' && $data['active'] && !DB::table('subjects')->where('id', $data['subject_id'])->where('active', true)->exists()) {
+                throw ValidationException::withMessages(['subject_id' => 'La asignatura no está activa.']);
+            }
             if (!DB::table('sections')->where('id', $data['section_id'])->where('grade_id', $data['grade_id'])->where('active', true)->exists()) throw ValidationException::withMessages(['section_id' => 'La sección no pertenece a un grado activo.']);
             if (!DB::table('school_years')->where('id', $data['school_year_id'])->where('active', true)->exists()) throw ValidationException::withMessages(['school_year_id' => 'El ciclo no está activo.']);
             if ($id && DB::table('marks')->where($resource === 'enrollments' ? 'enrollment_id' : 'assignment_id', $id)->exists()) {
@@ -112,6 +142,11 @@ class AcademicController extends Controller
             }
         }
         if (in_array($resource, ['periods', 'school_years']) && $data['end_date'] < $data['start_date']) throw ValidationException::withMessages(['end_date' => 'La fecha final debe ser posterior a la inicial.']);
+        if ($resource === 'school_years' && $id && DB::table('periods')->where('school_year_id', $id)->where(function ($query) use ($data) {
+            $query->where('start_date', '<', $data['start_date'])->orWhere('end_date', '>', $data['end_date']);
+        })->exists()) {
+            throw ValidationException::withMessages(['start_date' => 'Las fechas del ciclo deben incluir todos sus períodos.']);
+        }
         if ($resource === 'periods') {
             $cycle = DB::table('school_years')->find($data['school_year_id']);
             if ($data['start_date'] < $cycle->start_date || $data['end_date'] > $cycle->end_date) throw ValidationException::withMessages(['start_date' => 'El período debe estar dentro del ciclo.']);

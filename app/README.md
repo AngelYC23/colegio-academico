@@ -1,59 +1,45 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# La Generación del Mañana
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplicación Laravel para administrar estudiantes, profesores, encargados, estructura académica, inscripciones, asignaciones y calificaciones. Incluye informes y acceso por rol. La configuración del Mac usa SQLite y PHP de XAMPP; Docker y MySQL siguen disponibles como alternativa en el README de la raíz.
 
-## About Laravel
+## Trabajar en este Mac
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Desde esta carpeta (`app/`):
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+```sh
+./iniciar.command
+```
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Abre http://127.0.0.1:8088/ingresar. Mantén la terminal abierta; detén con Control + C. Si el puerto ya está ocupado por esta aplicación, usa la instancia que está abierta. El script no elige otro puerto automáticamente.
 
-## Learning Laravel
+La base local está en `database/database.sqlite`. El código se edita en `app/Http/Controllers`, `resources/views` y `public/css/academic.css`. El logo está en `public/images/colegio-logo.png`. Las modificaciones se ven al recargar; el diseño principal no necesita ejecutar Vite.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Preparar otra instalación
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Requisitos: PHP 8.3, Composer y las extensiones requeridas por Laravel, incluido PDO SQLite; se recomienda PHP 8.3 porque una herramienta de desarrollo del archivo de dependencias lo exige. PHP 8.2 permite ejecutar la aplicación con `composer install --no-dev`.
 
-## Laravel Sponsors
+```sh
+composer install
+cp .env.example .env
+php artisan key:generate
+php -r "file_exists('database/database.sqlite') || touch('database/database.sqlite');"
+php artisan migrate
+php artisan academic:create-admin
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+La configuración de ejemplo usa español, almacenamiento de fechas en UTC y fechas escolares en `America/Guatemala`. Los correos se guardan en el registro local: la recuperación por correo requiere configurar un servicio de envío real.
 
-### Premium Partners
+Para cargar opcionalmente los datos institucionales de presentación y las cuentas de acceso, consulta [ACCESO.md](ACCESO.md). El seeder no reemplaza registros existentes y solo funciona en entorno local. La base de datos y `.env` no se incluyen en Git.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Recorrido para presentar
 
-## Contributing
+1. Entrar con la cuenta administradora y mostrar el resumen.
+2. Consultar estudiantes, profesores y encargados.
+3. Revisar ciclos, grados, secciones, asignaturas y períodos en Configuración.
+4. Mostrar inscripciones y asignaciones docentes.
+5. Abrir un grupo de calificaciones y consultar los informes filtrados.
+6. Usar las cuentas de práctica de profesor, alumno y encargado para ver el acceso de cada rol.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Los períodos cerrados conservan sus notas. El conjunto de ejemplo corresponde al ciclo 2026; para registrar notas en otra fecha, configura un ciclo y un período vigentes. No se permite alterar el grupo de una inscripción o asignación que ya tenga notas.
 
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+El alcance definitivo del taller debe cotejarse con el enunciado del docente. La implementación actual no incluye pagos ni módulos administrativos ajenos a la gestión académica.
