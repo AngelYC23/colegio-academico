@@ -12,7 +12,7 @@ class DashboardController extends Controller
     {
         $stats = Auth::user()->role === 'admin' ? [
             'Estudiantes' => DB::table('students')->count(), 'Profesores' => DB::table('teachers')->count(),
-            'Inscripciones activas' => DB::table('enrollments')->where('active', true)->count(),
+            'Inscripciones activas' => DB::table('enrollments')->where('active', true)->whereIn('school_year_id', DB::table('school_years')->where('active', true)->select('id'))->count(),
             'Grados' => DB::table('grades')->count(), 'Secciones' => DB::table('sections')->count(),
             'Usuarios activos' => DB::table('users')->where('active', true)->count(),
         ] : [];

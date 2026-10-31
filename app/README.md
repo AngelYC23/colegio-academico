@@ -47,3 +47,7 @@ El alcance definitivo del taller debe cotejarse con el enunciado del docente. La
 ## Cursos por estudiante
 
 Consulta [CURSOS.md](CURSOS.md) para la selección individual de cursos, las listas de alumnos de cada profesor y la actualización de la base de datos.
+
+## Ciclos 2025/2027 y buscador
+
+Consulta [CICLOS_Y_BUSQUEDA.md](CICLOS_Y_BUSQUEDA.md) para usar los filtros y cargar opcionalmente los nuevos ciclos de ejemplo sin borrar datos existentes.

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Support\RelatedLabels;
 use App\Support\InputRules;
+use App\Support\RecordSearch;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -37,14 +39,23 @@ class AcademicController extends Controller
     {
         $this->admin();
         [$title, $fields] = $this->definition($resource);
-        $rows = DB::table($resource)->orderByDesc('id')->paginate(20);
+        [$searchQuery, $cycleId] = RecordSearch::filters(request());
+        $supportsCycle = !in_array($resource, ['users', 'relationships']);
+        $cycles = $supportsCycle ? RecordSearch::cycles() : collect();
+        $query = DB::table($resource)->orderByDesc($resource . '.id');
+        $columns = array_map(fn ($key) => $resource . '.' . $key, array_diff(array_keys($fields), array_keys(self::FOREIGN), ['active', 'open', 'primary']));
+        $relations = [];
+        foreach (array_intersect_key(self::FOREIGN, $fields) as $key => $table) $relations[$resource . '.' . $key] = $table;
+        RecordSearch::apply($query, $columns, $searchQuery, $relations);
+        if ($cycleId && $supportsCycle) $this->filterCycle($query, $resource, $cycleId);
+        $rows = $query->paginate(20)->withQueryString();
         $related = [];
         foreach (array_keys($fields) as $key) {
             if (isset(self::FOREIGN[$key])) {
                 $related[$key] = RelatedLabels::forIds(self::FOREIGN[$key], $rows->getCollection()->pluck($key));
             }
         }
-        return view('resource.index', compact('title', 'fields', 'rows', 'resource', 'related'));
+        return view('resource.index', compact('title', 'fields', 'rows', 'resource', 'related', 'searchQuery', 'cycleId', 'cycles', 'supportsCycle'));
     }
 
     public function form(string $resource, ?int $id = null)
@@ -266,6 +277,31 @@ class AcademicController extends Controller
             return redirect()->route('courses.teacher', $data['teacher_id'])->with('status', 'Curso asignado al profesor. Los alumnos se seleccionan individualmente desde Estudiantes → Cursos.');
         }
         return redirect()->route('resource.index', $resource)->with('status', 'Registro guardado correctamente.');
+    }
+
+    private function filterCycle(Builder $query, string $resource, int $cycle): void
+    {
+        if (in_array($resource, ['enrollments', 'assignments', 'periods'])) {
+            $query->where($resource . '.school_year_id', $cycle);
+        } elseif ($resource === 'school_years') {
+            $query->where('school_years.id', $cycle);
+        } elseif ($resource === 'students') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('enrollments as cycle_e')->whereColumn('cycle_e.student_id', 'students.id')->where('cycle_e.school_year_id', $cycle));
+        } elseif (in_array($resource, ['teachers', 'subjects'])) {
+            $column = $resource === 'teachers' ? 'teacher_id' : 'subject_id';
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('assignments as cycle_a')->whereColumn('cycle_a.' . $column, $resource . '.id')->where('cycle_a.school_year_id', $cycle));
+        } elseif (in_array($resource, ['grades', 'sections'])) {
+            $column = $resource === 'grades' ? 'grade_id' : 'section_id';
+            $query->where(function ($q) use ($resource, $column, $cycle) {
+                $q->whereExists(fn ($e) => $e->selectRaw('1')->from('enrollments as cycle_e')->whereColumn('cycle_e.' . $column, $resource . '.id')->where('cycle_e.school_year_id', $cycle))
+                    ->orWhereExists(fn ($a) => $a->selectRaw('1')->from('assignments as cycle_a')->whereColumn('cycle_a.' . $column, $resource . '.id')->where('cycle_a.school_year_id', $cycle));
+            });
+        } elseif ($resource === 'guardians') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('student_guardians as cycle_sg')->join('enrollments as cycle_e', 'cycle_e.student_id', '=', 'cycle_sg.student_id')
+                ->whereColumn('cycle_sg.guardian_id', 'guardians.id')->where('cycle_e.school_year_id', $cycle));
+        } elseif ($resource === 'student_guardians') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('enrollments as cycle_e')->whereColumn('cycle_e.student_id', 'student_guardians.student_id')->where('cycle_e.school_year_id', $cycle));
+        }
     }
 
     private function definition(string $resource): array

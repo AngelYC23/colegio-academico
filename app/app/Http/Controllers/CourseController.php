@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Database\Query\Builder;
+use App\Support\RecordSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,10 +20,12 @@ class CourseController extends Controller
             ->join('grades as g', 'g.id', '=', 'e.grade_id')->join('sections as s', 's.id', '=', 'e.section_id')
             ->where('e.student_id', $student)->orderByDesc('y.year')
             ->select('e.*', 'y.year', 'y.active as cycle_active', 'g.name as grade', 'g.level', 's.name as section', 'g.active as grade_active', 's.active as section_active')->get();
-        $request->validate(['enrollment' => 'nullable|integer|min:1']);
+        $request->validate(['enrollment' => 'nullable|integer|min:1', 'cycle' => 'nullable|integer|min:1|exists:school_years,id']);
         $enrollment = $request->filled('enrollment')
-            ? $enrollments->firstWhere('id', $request->integer('enrollment')) : $enrollments->first();
-        if ($request->filled('enrollment')) abort_unless($enrollment, 404);
+            ? $enrollments->firstWhere('id', $request->integer('enrollment'))
+            : ($request->filled('cycle') ? $enrollments->firstWhere('school_year_id', $request->integer('cycle')) : $enrollments->first());
+        if ($request->filled('enrollment') || $request->filled('cycle')) abort_unless($enrollment, 404);
+        if ($request->filled('cycle') && $enrollment) abort_unless((int) $enrollment->school_year_id === $request->integer('cycle'), 404);
         $selected = $enrollment ? DB::table('course_enrollments')->where('enrollment_id', $enrollment->id)->pluck('assignment_id')->all() : [];
         $locked = $enrollment ? DB::table('marks')->where('enrollment_id', $enrollment->id)->distinct()->pluck('assignment_id')->all() : [];
         $courses = $enrollment ? $this->offerings($enrollment)->where(function ($q) use ($selected) {
@@ -89,14 +92,19 @@ class CourseController extends Controller
         $person = DB::table('teachers')->find($teacher);
         abort_unless($person, 404);
         abort_unless(Auth::user()->role === 'admin' || (Auth::user()->role === 'teacher' && (int) $person->user_id === (int) Auth::id()), 403);
-        $courses = DB::table('assignments as a')->join('subjects as s', 's.id', '=', 'a.subject_id')
+        [$searchQuery, $cycleId] = RecordSearch::filters(request());
+        $cycles = RecordSearch::cycles();
+        $query = DB::table('assignments as a')->join('subjects as s', 's.id', '=', 'a.subject_id')
             ->join('school_years as y', 'y.id', '=', 'a.school_year_id')->join('grades as g', 'g.id', '=', 'a.grade_id')
             ->join('sections as sec', 'sec.id', '=', 'a.section_id')->where('a.teacher_id', $teacher)
-            ->select('a.*', 's.name as subject', 's.code', 'y.year', 'g.name as grade', 'g.level', 'sec.name as section')
+            ->select('a.*', 's.name as subject', 's.code', 'y.year', 'y.active as cycle_active', 'g.name as grade', 'g.level', 'sec.name as section')
             ->selectSub(DB::table('course_enrollments as ce')->join('enrollments as e', 'e.id', '=', 'ce.enrollment_id')
                 ->join('students as st', 'st.id', '=', 'e.student_id')->whereColumn('ce.assignment_id', 'a.id')->where('e.active', true)->where('st.active', true)
-                ->selectRaw('COUNT(*)'), 'student_count')->orderByDesc('y.year')->orderBy('s.name')->get();
-        return view('courses.teacher', compact('person', 'courses'));
+                ->selectRaw('COUNT(*)'), 'student_count')->orderByDesc('y.year')->orderBy('s.name');
+        if ($cycleId) $query->where('a.school_year_id', $cycleId);
+        RecordSearch::apply($query, ['s.name', 's.code', 'g.name', 'g.level', 'sec.name', 'y.year'], $searchQuery);
+        $courses = $query->get();
+        return view('courses.teacher', compact('person', 'courses', 'searchQuery', 'cycleId', 'cycles'));
     }
 
     public function roster(int $assignment)
@@ -107,11 +115,14 @@ class CourseController extends Controller
             ->where('a.id', $assignment)->select('a.*', 's.name as subject', 't.user_id as teacher_user_id', 't.first_name', 't.last_name', 'y.year', 'g.name as grade', 'g.level', 'sec.name as section')->first();
         abort_unless($course, 404);
         abort_unless(Auth::user()->role === 'admin' || (Auth::user()->role === 'teacher' && (int) $course->teacher_user_id === (int) Auth::id()), 403);
-        $students = DB::table('course_enrollments as ce')->join('enrollments as e', 'e.id', '=', 'ce.enrollment_id')
+        [$searchQuery] = RecordSearch::filters(request());
+        $query = DB::table('course_enrollments as ce')->join('enrollments as e', 'e.id', '=', 'ce.enrollment_id')
             ->join('students as st', 'st.id', '=', 'e.student_id')->where('ce.assignment_id', $assignment)
             ->where('e.active', true)->where('st.active', true)->orderBy('st.last_name')->orderBy('st.first_name')
-            ->select('st.id', 'st.code', 'st.first_name', 'st.last_name')->get();
-        return view('courses.roster', compact('course', 'students'));
+            ->select('st.id', 'st.code', 'st.first_name', 'st.last_name');
+        RecordSearch::apply($query, ['st.code', 'st.first_name', 'st.last_name'], $searchQuery);
+        $students = $query->get();
+        return view('courses.roster', compact('course', 'students', 'searchQuery'));
     }
 
     private function offerings(object $enrollment): Builder

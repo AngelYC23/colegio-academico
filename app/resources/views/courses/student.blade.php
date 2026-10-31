@@ -2,9 +2,10 @@
 @section('title', 'Cursos del estudiante')
 @section('content')
 <div class="toolbar"><div><h2 class="section-title">{{ $person->first_name }} {{ $person->last_name }}</h2><p class="section-note">{{ $person->code }}</p></div><a class="btn btn-outline-secondary" href="{{ route('resource.index', 'students') }}">Volver a estudiantes</a></div>
+@include('partials.person-details')
 @if($enrollments->isNotEmpty())
 <form method="get" class="card p-3 mb-3"><label class="form-label" for="enrollment">Inscripción y ciclo escolar</label><div class="d-flex gap-2"><select class="form-select" id="enrollment" name="enrollment">
-@foreach($enrollments as $item)<option value="{{ $item->id }}" @selected($enrollment?->id === $item->id)>{{ $item->year }} · {{ $item->grade }} ({{ $item->level }}) · Sección {{ $item->section }}{{ $item->active ? '' : ' · Inscripción inactiva' }}</option>@endforeach
+@foreach($enrollments as $item)<option value="{{ $item->id }}" @selected($enrollment?->id === $item->id)>{{ $item->year }} · {{ $item->grade }} ({{ $item->level }}) · Sección {{ $item->section }}{{ !$item->cycle_active ? ' · Ciclo cerrado' : ($item->year > now(config('academic.timezone'))->year ? ' · Próximo ciclo' : '') }}{{ $item->active ? '' : ' · Inscripción inactiva' }}</option>@endforeach
 </select><button class="btn btn-outline-primary">Consultar</button></div></form>
 @if(!$canEdit)<div class="alert alert-info">Consulta de cursos. Para cambiar la selección, el estudiante, su inscripción, ciclo, grado y sección deben estar activos.</div>@endif
 <form method="post" action="{{ route('courses.student.save', $person->id) }}" class="card">
