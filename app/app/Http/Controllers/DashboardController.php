@@ -30,7 +30,13 @@ class DashboardController extends Controller
             : DB::table('student_guardians')->whereIn('guardian_id', DB::table('guardians')->where('user_id', Auth::id())->select('id'))->pluck('student_id');
         $enrollments = DB::table('enrollments')->join('students', 'students.id', '=', 'enrollments.student_id')->join('school_years', 'school_years.id', '=', 'enrollments.school_year_id')->join('grades', 'grades.id', '=', 'enrollments.grade_id')->join('sections', 'sections.id', '=', 'enrollments.section_id')->whereIn('enrollments.student_id', $studentIds)->select('enrollments.id', 'students.first_name', 'students.last_name', 'students.code', 'school_years.year', 'grades.name as grade', 'grades.level', 'sections.name as section')->orderByDesc('school_years.year')->get();
         $marks = DB::table('marks')->join('enrollments', 'enrollments.id', '=', 'marks.enrollment_id')->join('students', 'students.id', '=', 'enrollments.student_id')->join('school_years', 'school_years.id', '=', 'enrollments.school_year_id')->join('assignments', 'assignments.id', '=', 'marks.assignment_id')->join('subjects', 'subjects.id', '=', 'assignments.subject_id')->join('periods', 'periods.id', '=', 'marks.period_id')->whereIn('enrollments.student_id', $studentIds)->select('students.first_name', 'students.last_name', 'students.code', 'school_years.year', 'subjects.name as subject', 'periods.name as period', 'marks.score')->get();
-        return view('personal', compact('enrollments', 'marks'));
+        $courses = DB::table('course_enrollments as ce')->join('enrollments as e', 'e.id', '=', 'ce.enrollment_id')
+            ->join('students as st', 'st.id', '=', 'e.student_id')->join('assignments as a', 'a.id', '=', 'ce.assignment_id')
+            ->join('subjects as s', 's.id', '=', 'a.subject_id')->join('teachers as t', 't.id', '=', 'a.teacher_id')
+            ->join('school_years as y', 'y.id', '=', 'e.school_year_id')->whereIn('e.student_id', $studentIds)
+            ->select('st.first_name', 'st.last_name', 'st.code', 'y.year', 's.name as subject', 't.first_name as teacher_first_name', 't.last_name as teacher_last_name', 'a.active')
+            ->orderByDesc('y.year')->orderBy('st.last_name')->orderBy('s.name')->get();
+        return view('personal', compact('enrollments', 'marks', 'courses'));
     }
 
     public function report(string $name)

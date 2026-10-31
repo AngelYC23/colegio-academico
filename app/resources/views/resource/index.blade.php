@@ -11,7 +11,13 @@ $roles = ['admin' => 'Administrador', 'teacher' => 'Profesor', 'student' => 'Est
 @if(in_array($key, ['active', 'primary', 'open']))<span @class(['status-pill', 'muted' => !$row->$key])>{{ $key === 'active' ? ($row->$key ? 'Activo' : 'Inactivo') : ($key === 'open' ? ($row->$key ? 'Abierto' : 'Cerrado') : ($row->$key ? 'Sí' : 'No')) }}</span>
 @elseif($key === 'role'){{ $roles[$row->$key] ?? $row->$key }}
 @else{{ isset($related[$key]) ? ($related[$key][$row->$key] ?? '—') : ($row->$key ?: '—') }}@endif
-</td>@endforeach<td class="text-end"><a class="btn btn-sm btn-outline-primary" aria-label="Editar registro {{ $row->id }}" href="{{ route('resource.edit', [$resource, $row->id]) }}">Editar</a></td></tr>
+</td>@endforeach<td class="text-end">
+@if($resource === 'students')<a class="btn btn-sm btn-outline-primary" href="{{ route('courses.student', $row->id) }}">Cursos</a>
+@elseif($resource === 'teachers')<a class="btn btn-sm btn-outline-primary" href="{{ route('courses.teacher', $row->id) }}">Cursos y alumnos</a>
+@elseif($resource === 'enrollments')<a class="btn btn-sm btn-outline-primary" href="{{ route('courses.student', ['student' => $row->student_id, 'enrollment' => $row->id]) }}">Cursos</a>
+@elseif($resource === 'assignments')<a class="btn btn-sm btn-outline-primary" href="{{ route('courses.roster', $row->id) }}">Alumnos</a>
+@endif
+<a class="btn btn-sm btn-outline-primary" aria-label="Editar registro {{ $row->id }}" href="{{ route('resource.edit', [$resource, $row->id]) }}">Editar</a></td></tr>
 @empty<tr><td colspan="{{ count($listFields) + 1 }}" class="empty-state"><strong>Aún no hay registros</strong>Usa «Agregar» para crear el primero.</td></tr>@endforelse
 </tbody></table></div></div>{{ $rows->links() }}
 @endsection

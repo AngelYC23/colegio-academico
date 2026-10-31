@@ -105,11 +105,17 @@ class AcademicDataSeeder extends Seeder
                 $record('student_guardians', ['student_id' => $student, 'guardian_id' => $guardians[$family]], [
                     'relationship_id' => $relationships[$family % 3], 'primary' => true,
                 ]);
+                $hadEnrollment = DB::table('enrollments')->where('student_id', $student)->where('school_year_id', $cycle)->exists();
                 $enrollment = $record('enrollments', ['student_id' => $student, 'school_year_id' => $cycle], [
                     'grade_id' => $groups[$g]['grade'], 'section_id' => $groups[$g]['section'],
                     'enrolled_at' => sprintf('2026-01-%02d', 5 + $i % 7), 'active' => true,
                 ]);
                 foreach ($assignments[$g] as $s => $assignment) {
+                    if (!$hadEnrollment) {
+                        $record('course_enrollments', ['enrollment_id' => $enrollment, 'assignment_id' => $assignment], []);
+                    }
+                    // Re-running the example data must preserve individual course choices.
+                    if (!DB::table('course_enrollments')->where('enrollment_id', $enrollment)->where('assignment_id', $assignment)->exists()) continue;
                     foreach ($periods as $p => $period) {
                         $score = 62 + (($i * 7 + $s * 11 + $p * 3) % 39);
                         $record('marks', ['enrollment_id' => $enrollment, 'assignment_id' => $assignment, 'period_id' => $period], [
